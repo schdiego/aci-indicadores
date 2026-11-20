@@ -1,5 +1,5 @@
 // Gera site/dados.json com DADOS FICTÍCIOS, só para testar o visual da página.
-// A página mostra uma faixa "dados de exemplo" enquanto exemplo = true.
+// A página mostra uma faixa "dados de exemplo" para as fontes listadas em exemplo_fontes.
 import { writeFile } from 'node:fs/promises';
 import { ARQUIVO_SAIDA } from '../src/config.js';
 import { mesesAte, chaveMes } from '../src/util.js';
@@ -18,7 +18,7 @@ const meses = mesesAte(2020, 2026, 9);
 const setores = ['Indústria', 'Comércio', 'Serviços', 'Construção', 'Agropecuária'];
 const pesoSetor = [0.3, 0.25, 0.32, 0.08, 0.05];
 
-const d = { exemplo: true, gerado_em: new Date().toISOString(), municipios: munis.map(({ f, ...m }) => m),
+const d = { exemplo_fontes: ['emprego', 'empresas', 'bolsa'], gerado_em: new Date().toISOString(), municipios: munis.map(({ f, ...m }) => m),
   empresas: { referencia: '2026-10-12', ativas: {}, mensal: {}, setor_anual: {} },
   emprego: { mensal: {}, setor_anual: {} }, bolsa_familia: { mensal: {} },
   status: {} };
