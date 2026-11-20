@@ -52,11 +52,16 @@ function montarEmpresas(linhas) {
   return { referencia, ativas, mensal, setor_anual: setorAnual };
 }
 
+const FONTES = [['emprego', 'emprego'], ['empresas', 'empresas'], ['bolsa', 'bolsa_familia']];
+
 async function main() {
   const lido = await lerAnterior();
-  // Dados de exemplo nunca são reaproveitados como se fossem coletados.
-  const anterior = lido.exemplo ? {} : lido;
-  const status = { ...(anterior.status || {}) };
+  // Fontes que ainda estão com dados de exemplo: nunca são reaproveitadas como se fossem coletadas.
+  const amostra = new Set(lido.exemplo_fontes ?? (lido.exemplo ? FONTES.map(([f]) => f) : []));
+  const anterior = { ...lido, status: { ...(lido.status || {}) } };
+  for (const [f, campo] of FONTES) if (amostra.has(f)) { delete anterior[campo]; delete anterior.status[f]; }
+  delete anterior.exemplo;
+  const status = { ...anterior.status };
   const saida = { ...anterior };
   const agora = new Date().toISOString();
 
@@ -109,13 +114,9 @@ async function main() {
   delete status.seguro;
   saida.status = status;
   saida.gerado_em = agora;
-  // Só deixa de ser "exemplo" quando todas as fontes já foram coletadas de verdade.
-  saida.exemplo = !['emprego', 'empresas', 'bolsa'].every((f) => status[f]?.atualizado_em);
-  if (saida.exemplo) {
-    for (const [f, campo] of [['emprego', 'emprego'], ['empresas', 'empresas'], ['bolsa', 'bolsa_familia']]) {
-      if (!status[f]?.atualizado_em) saida[campo] = lido[campo]; // mantém o exemplo só onde falta dado real
-    }
-  }
+  // Cada fonte sai do modo "exemplo" assim que for coletada de verdade; as outras mantêm o exemplo.
+  saida.exemplo_fontes = FONTES.filter(([f]) => !status[f]?.atualizado_em).map(([f]) => f);
+  for (const [f, campo] of FONTES) if (saida.exemplo_fontes.includes(f)) saida[campo] = lido[campo];
   await writeFile(ARQUIVO_SAIDA, JSON.stringify(saida));
   console.log(`\nGravado ${ARQUIVO_SAIDA.pathname}`);
 
