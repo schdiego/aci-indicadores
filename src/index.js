@@ -1,14 +1,15 @@
 // Coleta mensal dos indicadores de Bom Princípio/RS e vizinhos → site/dados.json
 // Uso:
 //   node src/index.js            coleta tudo
-//   node src/index.js --checar   só confere os esquemas do BigQuery e imprime as colunas
 //   node src/index.js --so=bolsa coleta só uma fonte (empresas | emprego | bolsa)
 import { readFile, writeFile } from 'node:fs/promises';
 import { ARQUIVO_SAIDA } from './config.js';
 import { chaveMes } from './util.js';
 import { resolverMunicipios, populacaoCenso2022 } from './fontes/ibge.js';
-import { conferirEsquemas, caged, empresas } from './fontes/bigquery.js';
+import { caged } from './fontes/caged.js';
+import { empresas, mesMaisRecente } from './fontes/cnpj.js';
 import { bolsaFamilia } from './fontes/bolsaFamilia.js';
+import { CHAVE_PORTAL } from './config.js';
 
 const args = process.argv.slice(2);
 const so = args.find((a) => a.startsWith('--so='))?.slice(5);
@@ -52,12 +53,6 @@ function montarEmpresas(linhas) {
 }
 
 async function main() {
-  if (args.includes('--checar')) {
-    await conferirEsquemas({ imprimir: true });
-    console.log('\nEsquemas OK.');
-    return;
-  }
-
   const lido = await lerAnterior();
   // Dados de exemplo nunca são reaproveitados como se fossem coletados.
   const anterior = lido.exemplo ? {} : lido;
@@ -73,14 +68,24 @@ async function main() {
 
   const etapas = [
     ['emprego', async () => {
-      await conferirEsquemas();
-      saida.emprego = montarEmprego(await caged(ids));
+      saida.emprego = montarEmprego(await caged(municipios));
     }],
     ['empresas', async () => {
-      await conferirEsquemas();
-      saida.empresas = montarEmpresas(await empresas(ids));
+      // A base do CNPJ tem ~11 GB: só baixa quando a Receita publica um mês novo.
+      const pasta = await mesMaisRecente();
+      const mesmaLista = JSON.stringify(anterior.empresas?.municipios) === JSON.stringify(ids);
+      if (anterior.empresas?.pasta === pasta && mesmaLista && !args.includes('--forcar')) {
+        console.log(`  CNPJ ${pasta} já processado; nada novo.`);
+        return;
+      }
+      const r = await empresas(municipios, { mes: pasta });
+      saida.empresas = { ...montarEmpresas(r.linhas), pasta: r.pasta, municipios: ids };
     }],
     ['bolsa', async () => {
+      if (!CHAVE_PORTAL) {
+        console.warn('  Bolsa Família pulado: falta a chave PORTAL_TRANSPARENCIA_KEY.');
+        return 'pulado';
+      }
       saida.bolsa_familia = { mensal: await bolsaFamilia(municipios, anterior.bolsa_familia?.mensal) };
     }],
   ];
@@ -90,7 +95,7 @@ async function main() {
     if (!roda(nome)) continue;
     console.log(`Coletando ${nome}…`);
     try {
-      await fn();
+      if ((await fn()) === 'pulado') continue;
       status[nome] = { ok: true, atualizado_em: agora };
     } catch (e) {
       console.error(`  ERRO em ${nome}: ${e.message}`);

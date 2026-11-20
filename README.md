@@ -6,8 +6,9 @@ O Wix mostra essa página dentro de um bloco "Incorporar site" (iframe).
 
 ```
 GitHub Actions (dias 3 e 18)  ──►  src/index.js  ──►  site/dados.json  ──►  GitHub Pages  ──►  iframe no Wix
-                                   ├─ BigQuery / Base dos Dados: Novo CAGED + CNPJ
-                                   ├─ Portal da Transparência: Bolsa Família
+                                   ├─ Receita Federal: arquivos abertos do CNPJ (sem cadastro)
+                                   ├─ MTE/PDET: microdados do Novo CAGED via FTP (sem cadastro)
+                                   ├─ Portal da Transparência: API do Bolsa Família (chave gratuita)
                                    └─ IBGE: códigos dos municípios + população Censo 2022
 ```
 
@@ -15,8 +16,8 @@ GitHub Actions (dias 3 e 18)  ──►  src/index.js  ──►  site/dados.jso
 
 | Indicador | Fonte | Atualização |
 |---|---|---|
-| Empresas abertas e fechadas, setor, MEI, ativas | CNPJ (Receita Federal) via `basedosdados.br_me_cnpj` | mensal |
-| Admissões, desligamentos e saldo, por setor | Novo CAGED (MTE) via `basedosdados.br_me_caged` | mensal |
+| Empresas abertas e fechadas, setor, MEI, ativas | Dados abertos do CNPJ (Receita Federal): Estabelecimentos, Simples, Municípios | mensal |
+| Admissões, desligamentos e saldo, por setor | Microdados do Novo CAGED (MTE), arquivos MOV + FOR − EXC (dados "com ajustes") | mensal |
 | Beneficiários e valor pago do Bolsa Família | API do Portal da Transparência (CGU) | mensal |
 | População | Censo 2022 (IBGE/SIDRA) | fixa |
 
@@ -25,26 +26,24 @@ da página é o saldo do Novo CAGED.
 
 ## Configuração (uma vez)
 
-1. **Google Cloud (BigQuery)**: crie um projeto (o modo sandbox do BigQuery não pede cartão).
-   Crie uma *service account* com os papéis **BigQuery Job User** e **BigQuery Data Viewer**,
-   e gere uma chave JSON.
-2. **Portal da Transparência**: cadastre um e-mail em
+1. **Portal da Transparência**: cadastre um e-mail em
    https://portaldatransparencia.gov.br/api-de-dados/cadastrar-email para receber a chave.
-3. **GitHub**: no repositório, em *Settings → Secrets and variables → Actions*, crie:
-   - `GCP_SA_KEY`: conteúdo do JSON da service account
-   - `GCP_PROJECT_ID`: ID do projeto do Google Cloud
-   - `PORTAL_TRANSPARENCIA_KEY`: chave do Portal
-4. Em *Settings → Pages*, escolha **Source: GitHub Actions**.
-5. Em *Actions → Atualizar indicadores → Run workflow*, rode a primeira coleta. A primeira
-   leva uns 10 minutos por causa do histórico do Bolsa Família desde 2020. As próximas são rápidas.
+2. **GitHub**: em *Settings → Secrets and variables → Actions*, crie o secret
+   `PORTAL_TRANSPARENCIA_KEY` com a chave recebida. (Sem a chave, empresas e emprego
+   são coletados normalmente e o Bolsa Família fica com os dados de exemplo.)
+3. Em *Settings → Pages*, escolha **Source: GitHub Actions**.
+4. Em *Actions → Atualizar indicadores → Run workflow*, rode a primeira coleta. A primeira
+   leva bastante tempo (histórico do CAGED desde 2020 + ~11 GB do CNPJ). As próximas só
+   baixam os meses novos; o CNPJ só é baixado quando a Receita publica um mês novo.
+
+O resumo de cada arquivo do CAGED já processado fica em `dados/cache-caged.json` —
+não apague, senão a próxima execução baixa tudo de novo.
 
 ## Uso local
 
 ```bash
 npm ci
-export GCP_PROJECT_ID=... PORTAL_TRANSPARENCIA_KEY=...
-gcloud auth application-default login
-npm run checar        # confere o esquema das tabelas no BigQuery
+export PORTAL_TRANSPARENCIA_KEY=...   # precisa de curl, unzip e 7z instalados
 npm run coletar       # coleta tudo e grava site/dados.json
 node src/index.js --so=bolsa   # só uma fonte
 npm run exemplo       # dados FICTÍCIOS para testar o visual
@@ -56,13 +55,14 @@ npx serve site        # abre a página localmente
 - **Trocar as cidades vizinhas:** edite `VIZINHOS` em `src/config.js` (só os nomes).
 - **Se uma fonte falhar:** o site continua mostrando os dados anteriores dela, o rodapé indica a
   falha e o GitHub manda um e-mail de erro do workflow.
-- **Se a Base dos Dados mudar o esquema:** `npm run checar` mostra quais colunas sumiram.
+- **Se o governo mudar o formato de algum arquivo:** a fonte afetada falha com uma mensagem no
+  log do GitHub Actions dizendo o que veio diferente; as outras continuam funcionando.
 
 ## Observações de metodologia
 
 - Empresas: conta **estabelecimentos** (matriz e filiais) com endereço no município, pela data
   de início de atividade (abertas) e pela data de baixa (fechadas, situação 8), usando a
   fotografia mais recente do cadastro. O mês da fotografia fica incompleto e não é exibido.
-- CAGED: usa a tabela de movimentações do mês **sem** as declarações fora do prazo, por isso
-  pode haver pequenas diferenças em relação aos painéis "com ajustes" do MTE.
+- CAGED: soma as movimentações do prazo (MOV) e fora do prazo (FOR) e subtrai as excluídas (EXC),
+  pela competência de cada movimentação — o mesmo critério "com ajustes" do MTE.
 - Bolsa Família: entre nov/2021 e fev/2023 os dados vêm do Auxílio Brasil.

@@ -17,9 +17,6 @@ export const VIZINHOS = [
 // Início das séries (o Novo CAGED começa em jan/2020).
 export const ANO_INICIAL = 2020;
 
-// Projeto do Google Cloud que paga as consultas ao BigQuery (cabe no free tier).
-export const GCP_PROJECT = process.env.GCP_PROJECT_ID;
-
 // Chave da API do Portal da Transparência (cadastro gratuito em
 // https://portaldatransparencia.gov.br/api-de-dados/cadastrar-email).
 export const CHAVE_PORTAL = process.env.PORTAL_TRANSPARENCIA_KEY;
