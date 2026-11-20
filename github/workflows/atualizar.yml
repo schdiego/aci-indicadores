@@ -1,0 +1,87 @@
+name: Atualizar indicadores
+
+on:
+  schedule:
+    # Dias 3 e 18 de cada mês, 06:17 de Brasília (09:17 UTC).
+    # O CAGED sai no fim do mês seguinte, o CNPJ da Receita em meados do mês
+    # e o Bolsa Família ao longo do mês, então duas rodadas pegam tudo.
+    - cron: '17 9 3,18 * *'
+  workflow_dispatch:
+    inputs:
+      fonte:
+        description: 'Coletar só uma fonte (empresas, emprego, bolsa). Vazio = todas.'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: atualizar-indicadores
+  cancel-in-progress: false
+
+jobs:
+  coletar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      # Enquanto as chaves não forem cadastradas, o site é publicado com os dados de exemplo.
+      TEM_CHAVES: ${{ secrets.GCP_SA_KEY != '' && secrets.PORTAL_TRANSPARENCIA_KEY != '' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Autenticar no Google Cloud (BigQuery)
+        if: env.TEM_CHAVES == 'true'
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Coletar dados
+        id: coleta
+        if: env.TEM_CHAVES == 'true'
+        continue-on-error: true
+        env:
+          GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+          PORTAL_TRANSPARENCIA_KEY: ${{ secrets.PORTAL_TRANSPARENCIA_KEY }}
+        run: |
+          if [ -n "${{ inputs.fonte }}" ]; then
+            node src/index.js --so=${{ inputs.fonte }}
+          else
+            node src/index.js
+          fi
+
+      - name: Salvar dados no repositório
+        if: env.TEM_CHAVES == 'true'
+        run: |
+          git config user.name "aci-indicadores-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add site/dados.json
+          git diff --cached --quiet || git commit -m "Atualiza indicadores ($(date +%Y-%m-%d))"
+          git push
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+      - name: Publicar no GitHub Pages
+        uses: actions/deploy-pages@v4
+
+      - name: Avisar que as chaves ainda não foram cadastradas
+        if: env.TEM_CHAVES != 'true'
+        run: echo "::warning::Secrets GCP_SA_KEY / GCP_PROJECT_ID / PORTAL_TRANSPARENCIA_KEY ainda não cadastrados — site publicado com dados de exemplo."
+
+      - name: Avisar se alguma fonte falhou
+        if: steps.coleta.outcome == 'failure'
+        run: |
+          echo "::error::Alguma fonte falhou na coleta. Os dados anteriores dela foram mantidos no site. Veja o passo 'Coletar dados'."
+          exit 1
