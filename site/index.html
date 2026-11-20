@@ -41,9 +41,6 @@
   .aviso { background: #FFF3CD; border: 1px solid #E8C770; color: #5A4300; padding: 10px 14px; border-radius: 8px; margin: 16px 0 0; font-size: 14px; }
   .aviso[hidden] { display: none; }
 
-  nav.secoes { display: flex; flex-wrap: wrap; gap: 8px; margin: 24px 0 8px; }
-  nav.secoes a { text-decoration: none; color: var(--aci); border: 1.5px solid var(--aci); padding: 6px 14px; border-radius: 999px; font-weight: 600; font-size: 14px; }
-  nav.secoes a:hover { background: var(--aci); color: #fff; }
 
   .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin-top: 20px; }
   .kpi { background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; border-top: 4px solid var(--aci); }
@@ -114,12 +111,9 @@
     <h1>Bom Princípio em Números</h1>
     <p class="sub">Indicadores da economia local a partir de dados públicos oficiais: abertura de empresas, emprego com carteira assinada e Bolsa Família.</p>
     <p class="meta" id="meta"></p>
-    <p class="aviso" id="aviso-exemplo" hidden><b>Dados de exemplo.</b> Os números abaixo são fictícios, só para revisar o visual. Eles serão trocados pelos dados oficiais na primeira coleta.</p>
+    <p class="aviso" id="aviso-exemplo" hidden></p>
   </header>
 
-  <nav class="secoes" aria-label="Seções">
-    <a href="#empresas">Empresas</a><a href="#emprego">Emprego</a><a href="#bolsa">Bolsa Família</a><a href="#comparar">Comparar cidades</a>
-  </nav>
 
   <div class="kpis" id="kpis"></div>
 
@@ -269,8 +263,18 @@
     return;
   }
   const P = D.municipios.find((m) => m.principal).id;
-  document.getElementById('aviso-exemplo').hidden = !D.exemplo;
-  document.getElementById('meta').textContent = `Atualizado em ${new Date(D.gerado_em).toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' })}`;
+  const EXEMPLO = D.exemplo_fontes ?? (D.exemplo ? ['emprego', 'empresas', 'bolsa'] : []);
+  const NOME_FONTE = { empresas: 'Empresas', emprego: 'Emprego', bolsa: 'Bolsa Família' };
+  if (EXEMPLO.length) {
+    const lista = EXEMPLO.map((f) => NOME_FONTE[f]);
+    const nomes = lista.length > 1 ? `${lista.slice(0, -1).join(', ')} e ${lista.at(-1)}` : lista[0];
+    const aviso = document.getElementById('aviso-exemplo');
+    aviso.innerHTML = `<b>Dados de exemplo em ${nomes}.</b> Esses números são fictícios e serão trocados pelos dados oficiais assim que ${lista.length > 1 ? 'essas fontes forem coletadas' : 'essa fonte for coletada'}.`;
+    aviso.hidden = false;
+  }
+  const quando = new Date(D.gerado_em);
+  const tz = { timeZone: 'America/Sao_Paulo' };
+  document.getElementById('meta').textContent = `Atualizado em ${quando.toLocaleDateString('pt-BR', { ...tz, day: 'numeric', month: 'long', year: 'numeric' })}, às ${quando.toLocaleTimeString('pt-BR', { ...tz, hour: '2-digit', minute: '2-digit' })}`;
 
   // ---------- helpers de séries ----------
   const serie = (fonte, id = P) => (D[fonte]?.mensal?.[id]) || {};
@@ -601,7 +605,7 @@
 
   // ---------- status das fontes ----------
   const NOMES = { empresas: 'Empresas', emprego: 'Emprego', bolsa: 'Bolsa Família' };
-  const st = Object.entries(D.status || {}).filter(([f]) => NOMES[f]).map(([f, s]) => s.ok ? `${NOMES[f]}: ${new Date(s.atualizado_em).toLocaleDateString('pt-BR')}`
+  const st = Object.entries(D.status || {}).filter(([f]) => NOMES[f] && !EXEMPLO.includes(f)).map(([f, s]) => s.ok ? `${NOMES[f]}: ${new Date(s.atualizado_em).toLocaleDateString('pt-BR')}`
     : `<span class="falha">${NOMES[f]}: última tentativa falhou, exibindo dados de ${s.atualizado_em ? new Date(s.atualizado_em).toLocaleDateString('pt-BR') : '—'}</span>`);
   document.getElementById('status-fontes').innerHTML = st.length ? `<b>Última coleta por fonte:</b> ${st.join(' · ')}` : '';
 
