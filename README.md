@@ -6,7 +6,6 @@ O Wix mostra essa página dentro de um bloco "Incorporar site" (iframe).
 
 ```
 GitHub Actions (dias 3 e 18)  ──►  src/index.js  ──►  site/dados.json  ──►  GitHub Pages  ──►  iframe no Wix
-                                   ├─ Receita Federal: arquivos abertos do CNPJ (sem cadastro)
                                    ├─ MTE/PDET: microdados do Novo CAGED via FTP (sem cadastro)
                                    ├─ Portal da Transparência: API do Bolsa Família (chave gratuita)
                                    └─ IBGE: códigos dos municípios + população Censo 2022
@@ -16,8 +15,6 @@ GitHub Actions (dias 3 e 18)  ──►  src/index.js  ──►  site/dados.jso
 
 | Indicador | Fonte | Atualização |
 |---|---|---|
-| Empresas abertas e fechadas, setor, MEI, ativas (histórico) | Dados abertos do CNPJ (Receita Federal): Estabelecimentos, Simples, Municípios — rodado no computador | mensal |
-| Empresas abertas, fechadas e ativas (meses recentes) | Mapa de Empresas (MEMP), planilhas de dados abertos — automático no GitHub | mensal |
 | Admissões, desligamentos e saldo, por setor | Microdados do Novo CAGED (MTE), arquivos MOV + FOR − EXC (dados "com ajustes") | mensal |
 | Beneficiários e valor pago do Bolsa Família | API do Portal da Transparência (CGU) | mensal |
 | População | Censo 2022 (IBGE/SIDRA) | fixa |
@@ -35,29 +32,6 @@ da página é o saldo do Novo CAGED.
 3. Em *Settings → Pages*, escolha **Source: GitHub Actions**.
 4. Em *Actions → Atualizar indicadores → Run workflow*, rode a primeira coleta. A primeira
    leva bastante tempo (histórico do CAGED desde 2020). As próximas só baixam os meses novos.
-
-## Empresas
-
-Os meses recentes vêm sozinhos do Mapa de Empresas (o histórico das planilhas vai sendo
-guardado em `dados/mapa-empresas.json`). O histórico desde 2020, o setor e o MEI vêm da
-base do CNPJ, que precisa ser baixada num computador no Brasil — basta uma vez; repetir
-de vez em quando só deixa os dados do CNPJ mais atuais.
-
-### CNPJ: rodar no computador
-
-O servidor da Receita recusa conexões de fora do Brasil, e as máquinas do GitHub ficam
-nos EUA. Por isso a base do CNPJ é baixada num computador no Brasil (Windows, Mac ou Linux,
-só precisa do Node 22+):
-
-1. Baixe o projeto (*Code → Download ZIP*) e descompacte, ou use a pasta que já tem.
-2. Abra um terminal na pasta e rode, na primeira vez, `npm install`.
-3. Rode `npm run empresas`. Ele baixa ~11 GB, um arquivo por vez (apagando cada um
-   depois de ler), e grava `dados/empresas.json` (poucos KB). Leva de 30 min a algumas horas.
-4. No GitHub, abra a pasta `dados` → *Add file → Upload files* e envie o `empresas.json`.
-   O envio dispara o robô, que junta as empresas aos outros dados e publica o site.
-
-O resumo de cada arquivo do CAGED já processado fica em `dados/cache-caged.json` —
-não apague, senão a próxima execução baixa tudo de novo.
 
 ## Uso local
 
@@ -80,7 +54,6 @@ npx serve site        # abre a página localmente
 
 ## Observações de metodologia
 
-- Empresas: conta **estabelecimentos** (matriz e filiais) com endereço no município, pela data
   de início de atividade (abertas) e pela data de baixa (fechadas, situação 8), usando a
   fotografia mais recente do cadastro. O mês da fotografia fica incompleto e não é exibido.
 - CAGED: soma as movimentações do prazo (MOV) e fora do prazo (FOR) e subtrai as excluídas (EXC),

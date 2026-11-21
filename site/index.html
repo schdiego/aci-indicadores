@@ -109,50 +109,13 @@
 
   <header>
     <h1>Bom Princípio em Números</h1>
-    <p class="sub">Indicadores da economia local a partir de dados públicos oficiais: abertura de empresas, emprego com carteira assinada e Bolsa Família.</p>
+    <p class="sub">Indicadores da economia local a partir de dados públicos oficiais: emprego com carteira assinada e Bolsa Família.</p>
     <p class="meta" id="meta"></p>
     <p class="aviso" id="aviso-exemplo" hidden></p>
   </header>
 
 
   <div class="kpis" id="kpis"></div>
-
-  <!-- ========================= EMPRESAS ========================= -->
-  <section class="bloco" id="empresas">
-    <h2>Empresas</h2>
-    <p class="desc" id="d-empresas">Empresas com endereço em Bom Princípio, pela data de abertura e de baixa no CNPJ.</p>
-    <div class="controles">
-      <div class="grupo" role="group" aria-label="Indicador">
-        <span class="rotulo">Mostrar</span>
-        <button class="chip" data-emp-metrica="abertas" aria-pressed="true">Abertas</button>
-        <button class="chip" data-emp-metrica="fechadas" aria-pressed="false">Fechadas</button>
-        <button class="chip" data-emp-metrica="saldo" aria-pressed="false">Saldo</button>
-      </div>
-      <div class="grupo" role="group" aria-label="Anos para comparar"><span class="rotulo">Comparar anos (até 3)</span><span id="anos-emp"></span></div>
-    </div>
-    <div class="grade">
-      <div class="card doisTercos" data-card="emp-mensal">
-        <div class="card-topo"><h3 id="t-emp-mensal">Empresas por mês</h3><button class="btn-tabela">Ver tabela</button></div>
-        <p class="nota">Cada cor é um ano. Passe o mouse para ver os valores.</p>
-        <div class="legenda"></div><div class="area"><canvas></canvas></div><div class="tabela-wrap" hidden></div>
-      </div>
-      <div class="card terco" data-card="emp-anual">
-        <div class="card-topo"><h3 id="t-emp-anual">Acumulado no ano</h3><button class="btn-tabela">Ver tabela</button></div>
-        <p class="nota" id="n-emp-anual"></p>
-        <div class="area"><canvas></canvas></div><div class="tabela-wrap" hidden></div>
-      </div>
-      <div class="card meio" data-card="emp-setor">
-        <div class="card-topo"><h3 id="t-emp-setor">Por setor</h3><button class="btn-tabela">Ver tabela</button></div>
-        <p class="nota" id="n-emp-setor"></p>
-        <div class="area"><canvas></canvas></div><div class="tabela-wrap" hidden></div>
-      </div>
-      <div class="card meio">
-        <h3>Retrato atual</h3>
-        <p class="nota" id="n-emp-retrato"></p>
-        <div class="mini" id="emp-retrato"></div>
-      </div>
-    </div>
-  </section>
 
   <!-- ========================= EMPREGO ========================= -->
   <section class="bloco" id="emprego">
@@ -204,8 +167,6 @@
     <div class="controles">
       <div class="grupo"><span class="rotulo">Indicador</span>
         <select id="cmp-metrica">
-          <option value="abertas">Empresas abertas</option>
-          <option value="saldoEmp">Saldo de empresas (abertas − fechadas)</option>
           <option value="caged">Saldo de empregos formais</option>
           <option value="bf">Beneficiários do Bolsa Família (média mensal)</option>
         </select>
@@ -228,7 +189,7 @@
   <footer class="fontes">
     <h3>Fontes e metodologia</h3>
     <ul>
-      <li><b>Empresas:</b> <a href="https://dados.gov.br/dados/conjuntos-dados/cadastro-nacional-da-pessoa-juridica---cnpj" target="_blank" rel="noopener">dados abertos do CNPJ</a> (Receita Federal) para o histórico e os setores: conta estabelecimentos (matrizes e filiais) pela data de início de atividade (abertas) e pela data de baixa (fechadas); “abertas como MEI” são optantes do MEI na abertura. Os meses mais recentes vêm do <a href="https://www.gov.br/memp/pt-br/acesso-a-informacao/dados-abertos/repositorio-de-dados-abertos" target="_blank" rel="noopener">Mapa de Empresas</a> (Ministério do Empreendedorismo), que pode diferir um pouco do CNPJ na contagem.</li>
+
       <li><b>Emprego:</b> <a href="https://www.gov.br/trabalho-e-emprego/pt-br/assuntos/estatisticas-trabalho/novo-caged" target="_blank" rel="noopener">Novo CAGED</a> (Ministério do Trabalho e Emprego), microdados de movimentação, incluindo declarações fora do prazo e exclusões (critério “com ajustes”).</li>
       <li><b>Bolsa Família:</b> <a href="https://portaldatransparencia.gov.br" target="_blank" rel="noopener">Portal da Transparência</a> (CGU), pagamentos por município.</li>
       <li><b>População:</b> Censo Demográfico 2022 (IBGE).</li>
@@ -263,8 +224,8 @@
     return;
   }
   const P = D.municipios.find((m) => m.principal).id;
-  const EXEMPLO = D.exemplo_fontes ?? (D.exemplo ? ['emprego', 'empresas', 'bolsa'] : []);
-  const NOME_FONTE = { empresas: 'Empresas', emprego: 'Emprego', bolsa: 'Bolsa Família' };
+  const NOME_FONTE = { emprego: 'Emprego', bolsa: 'Bolsa Família' };
+  const EXEMPLO = (D.exemplo_fontes ?? (D.exemplo ? ['emprego', 'bolsa'] : [])).filter((f) => NOME_FONTE[f]);
   if (EXEMPLO.length) {
     const lista = EXEMPLO.map((f) => NOME_FONTE[f]);
     const nomes = lista.length > 1 ? `${lista.slice(0, -1).join(', ')} e ${lista.at(-1)}` : lista[0];
@@ -288,24 +249,6 @@
     return tem ? t : null;
   };
 
-  // Empresas: o cadastro é uma "fotografia"; o mês da fotografia está incompleto.
-  const empS = (() => {
-    const s = { ...serie('empresas') };
-    for (const key of Object.keys(s)) s[key] = { ...s[key], saldo: (s[key].abertas || 0) - (s[key].fechadas || 0) };
-    return s;
-  })();
-  const refEmp = (() => {
-    const r = D.empresas?.referencia;
-    if (!r) return ultima(empS);
-    const d = new Date(r + 'T12:00:00'); d.setMonth(d.getMonth() - 1);
-    return k(d.getFullYear(), d.getMonth() + 1);
-  })();
-  const empAte = (id) => {
-    const s = serie('empresas', id), out = {};
-    for (const key of chaves(s)) if (key <= refEmp) out[key] = { ...s[key], saldo: (s[key].abertas || 0) - (s[key].fechadas || 0) };
-    return out;
-  };
-  const EMP = empAte(P);
   const CAG = serie('emprego');
   const BF = serie('bolsa_familia');
 
@@ -389,11 +332,6 @@
       const cls = dif > 0 ? 'seta-up' : dif < 0 ? 'seta-down' : '';
       return `<span class="${cls}"><b>${sinal(dif)}</b> vs. ${rotuloAnt} (${nf.format(anterior)})</span>`;
     };
-    if (refEmp && EMP[refEmp]) {
-      const [a, m] = refEmp.split('-').map(Number);
-      const v = EMP[refEmp].abertas, ant = valor(EMP, k(a - 1, m), 'abertas');
-      tiles.push({ rot: `Empresas abertas em ${nomeMes(refEmp)}`, val: nf.format(v), cmp: comp(v, ant, nomeMes(k(a - 1, m))) });
-    }
     const uc = ultima(CAG);
     if (uc) {
       const [a, m] = uc.split('-').map(Number);
@@ -410,84 +348,6 @@
     document.getElementById('kpis').innerHTML = tiles.map((t) =>
       `<div class="kpi"><div class="rot">${t.rot}</div><div class="val">${t.val}</div><div class="cmp">${t.cmp}</div></div>`).join('');
   }
-
-  // ---------- EMPRESAS ----------
-  let empMetrica = 'abertas';
-  const ROT_EMP = { abertas: 'Empresas abertas', fechadas: 'Empresas fechadas', saldo: 'Saldo (abertas − fechadas)' };
-  const anosEmp = anos(EMP);
-  let selEmp;
-  function renderEmpresas() {
-    if (!anosEmp.length) {
-      ['emp-mensal', 'emp-anual', 'emp-setor'].forEach((n) => vazio(n, 'Dados ainda não coletados.'));
-      return;
-    }
-    const sel = selEmp();
-    const [aRef, mRef] = refEmp.split('-').map(Number);
-    document.getElementById('t-emp-mensal').textContent = `${ROT_EMP[empMetrica]} por mês`;
-    const datasets = sel.map(({ ano, cor: c }) => ({
-      label: String(ano), backgroundColor: c, borderRadius: { topLeft: 4, topRight: 4, bottomLeft: empMetrica === 'saldo' ? 4 : 0, bottomRight: empMetrica === 'saldo' ? 4 : 0 },
-      borderSkipped: empMetrica === 'saldo' ? false : 'bottom', borderColor: cor('--surface-1'), borderWidth: { left: 1, right: 1 },
-      data: MESES.map((_, i) => valor(EMP, k(ano, i + 1), empMetrica) ?? null), maxBarThickness: 22,
-    }));
-    legenda('emp-mensal', sel.map((s) => ({ nome: s.ano, cor: s.cor })));
-    desenhar('emp-mensal', {
-      type: 'bar', data: { labels: MESES, datasets },
-      options: { maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, scales: eixos(undefined, { y: { beginAtZero: true } }),
-        plugins: { tooltip: { callbacks: { label: (c) => ` ${c.dataset.label}: ${c.raw == null ? '—' : nf.format(c.raw)}` } } } },
-    }, { colunas: ['Mês', ...sel.map((s) => s.ano)], linhas: MESES.map((m, i) => [m, ...sel.map((s) => { const v = valor(EMP, k(s.ano, i + 1), empMetrica); return v == null ? null : nf.format(v); })]) });
-
-    // Acumulado jan → mês de referência, todos os anos (comparação justa)
-    document.getElementById('t-emp-anual').textContent = `Acumulado jan–${MESES[mRef - 1]}`;
-    document.getElementById('n-emp-anual').textContent = `Mesmo período em todos os anos, para comparar ${aRef} (dado mais recente: ${nomeMes(refEmp)}) com os anteriores.`;
-    const totais = anosEmp.map((a) => somaPeriodo(EMP, a, mRef, empMetrica));
-    const corAno = (a) => (sel.find((s) => s.ano === a)?.cor) || cor('--outros');
-    desenhar('emp-anual', {
-      type: 'bar', data: { labels: anosEmp.map(String), datasets: [{ label: ROT_EMP[empMetrica], data: totais,
-        backgroundColor: anosEmp.map(corAno), borderRadius: 4, borderSkipped: empMetrica === 'saldo' ? false : 'bottom', maxBarThickness: 34 }] },
-      options: { maintainAspectRatio: false, scales: eixos(), plugins: { tooltip: { callbacks: { title: (c) => `jan–${MESES[mRef - 1]} de ${c[0].label}`, label: (c) => ` ${nf.format(c.raw)}` } } } },
-    }, { colunas: ['Ano', `jan–${MESES[mRef - 1]}`, 'Ano completo'], linhas: anosEmp.map((a, i) => [a, nf.format(totais[i] ?? 0), a === aRef ? '(em andamento)' : nf.format(somaPeriodo(EMP, a, 12, empMetrica) ?? 0)]) });
-
-    // Setores no ano mais recente selecionado
-    const anoSetor = sel.at(-1).ano;
-    const setores = D.empresas?.setor_anual?.[P]?.[anoSetor] || {};
-    const campoSetor = empMetrica === 'fechadas' ? 'fechadas' : 'abertas';
-    const pares = Object.entries(setores).filter(([s]) => s !== 'Não identificado')
-      .map(([s, v]) => [s, empMetrica === 'saldo' ? v.abertas - v.fechadas : v[campoSetor]]).sort((x, y) => y[1] - x[1]);
-    document.getElementById('t-emp-setor').textContent = `${ROT_EMP[empMetrica]} por setor — ${anoSetor}`;
-    document.getElementById('n-emp-setor').textContent = anoSetor === aRef ? `Até ${nomeMes(refEmp)}.` : 'Ano completo.';
-    if (!pares.length) vazio('emp-setor', D.empresas?.cnpj_ate ? 'Sem dados por setor para este ano.' : 'Os setores aparecem depois da primeira coleta do cadastro da Receita.');
-    else desenhar('emp-setor', {
-      type: 'bar', data: { labels: pares.map((p) => p[0]), datasets: [{ data: pares.map((p) => p[1]), backgroundColor: cor('--series-1'), borderRadius: 4, borderSkipped: false, maxBarThickness: 26 }] },
-      options: { indexAxis: 'y', maintainAspectRatio: false, scales: { x: { grid: { color: cor('--grid') }, border: { display: false }, ticks: { maxTicksLimit: 5 } }, y: { grid: { display: false }, border: { color: cor('--border') } } },
-        plugins: { tooltip: { callbacks: { label: (c) => ` ${nf.format(c.raw)}` } } } },
-    }, { colunas: ['Setor', ROT_EMP[empMetrica]], linhas: pares.map(([s, v]) => [s, nf.format(v)]) });
-  }
-  function retratoEmpresas() {
-    const ativas = D.empresas?.ativas?.[P];
-    const [aRef, mRef] = (refEmp || '').split('-').map(Number);
-    const ab = aRef ? somaPeriodo(EMP, aRef, mRef, 'abertas') : null;
-    const mei = aRef ? somaPeriodo(EMP, aRef, mRef, 'abertas_mei') : null;
-    const fe = aRef ? somaPeriodo(EMP, aRef, mRef, 'fechadas') : null;
-    const iniMapa = D.empresas?.inicio_mapa, cnpjAte = D.empresas?.cnpj_ate;
-    let fonteTxt = '';
-    if (iniMapa && cnpjAte) fonteTxt = `Cadastro da Receita até ${nomeMes(cnpjAte)}; a partir de ${nomeMes(iniMapa)}, Mapa de Empresas.`;
-    else if (iniMapa) fonteTxt = `Mapa de Empresas, até ${nomeMes(refEmp)}.`;
-    else if (D.empresas?.referencia) fonteTxt = `Cadastro da Receita de ${new Date(D.empresas.referencia + 'T12:00:00').toLocaleDateString('pt-BR')}.`;
-    document.getElementById('n-emp-retrato').textContent = fonteTxt + (aRef ? ` Acumulados de ${aRef} até ${MESES[mRef - 1]}.` : '');
-    const itens = [];
-    if (ativas != null) itens.push([iniMapa ? 'Empresas ativas' : 'Estabelecimentos ativos', nf.format(ativas)]);
-    if (ab != null) itens.push([`Abertas em ${aRef}`, nf.format(ab)]);
-    // O Mapa de Empresas não informa MEI: só mostra a fatia de MEI se o ano inteiro vier do CNPJ.
-    if (ab && mei != null && !(iniMapa && iniMapa <= refEmp && +iniMapa.slice(0, 4) <= aRef)) itens.push([`Abertas como MEI em ${aRef}`, `${Math.round((mei / ab) * 100)}%`]);
-    if (fe != null) itens.push([`Fechadas em ${aRef}`, nf.format(fe)]);
-    document.getElementById('emp-retrato').innerHTML = itens.map(([r, v]) => `<div><div class="val">${v}</div><div class="rot">${r}</div></div>`).join('') || '<p class="nota">Dados ainda não coletados.</p>';
-  }
-  document.querySelectorAll('[data-emp-metrica]').forEach((b) => b.addEventListener('click', () => {
-    empMetrica = b.dataset.empMetrica;
-    document.querySelectorAll('[data-emp-metrica]').forEach((x) => x.setAttribute('aria-pressed', x === b));
-    renderEmpresas();
-  }));
-  selEmp = anosEmp.length ? seletorAnos('anos-emp', anosEmp, renderEmpresas) : () => [];
 
   // ---------- EMPREGO ----------
   const anosCag = anos(CAG);
@@ -560,14 +420,10 @@
   // ---------- COMPARAR ----------
   const selMetrica = document.getElementById('cmp-metrica'), selAno = document.getElementById('cmp-ano');
   let escala = 'abs';
-  const todosAnos = [...new Set([...anosEmp, ...anosCag, ...anos(BF)])].sort().reverse();
+  const todosAnos = [...new Set([...anosCag, ...anos(BF)])].sort().reverse();
   selAno.innerHTML = todosAnos.map((a) => `<option>${a}</option>`).join('');
-  const ROT_CMP = { abertas: 'Empresas abertas', saldoEmp: 'Saldo de empresas', caged: 'Saldo de empregos formais', bf: 'Beneficiários do Bolsa Família (média mensal)' };
+  const ROT_CMP = { caged: 'Saldo de empregos formais', bf: 'Beneficiários do Bolsa Família (média mensal)' };
   function valorCidade(id, metrica, ano) {
-    if (metrica === 'abertas' || metrica === 'saldoEmp') {
-      const s = empAte(id); const campo = metrica === 'abertas' ? 'abertas' : 'saldo';
-      return somaPeriodo(s, ano, ano === +refEmp.slice(0, 4) ? +refEmp.slice(5) : 12, campo);
-    }
     if (metrica === 'caged') return somaPeriodo(serie('emprego', id), ano, 12, 'saldo');
     if (metrica === 'bf') {
       const s = serie('bolsa_familia', id); const vs = MESES.map((_, i) => valor(s, k(ano, i + 1), 'beneficiarios')).filter((v) => v != null);
@@ -575,8 +431,8 @@
     }
   }
   function periodoTexto(metrica, ano) {
-    const fonte = { abertas: EMP, saldoEmp: EMP, caged: CAG, bf: BF }[metrica];
-    const ult = chaves(fonte).filter((x) => x.startsWith(ano + '-') && (fonte !== EMP || x <= refEmp)).at(-1);
+    const fonte = { caged: CAG, bf: BF }[metrica];
+    const ult = chaves(fonte).filter((x) => x.startsWith(ano + '-')).at(-1);
     if (!ult) return '';
     const m = +ult.slice(5);
     return m < 12 ? `${ano}, de janeiro até ${MESES_LONGOS[m - 1]}` : `${ano}, ano completo`;
@@ -591,7 +447,7 @@
     document.getElementById('t-cmp').textContent = `${ROT_CMP[metrica]}${escala === 'mil' ? ' por mil habitantes' : ''}`;
     document.getElementById('n-cmp').textContent = periodoTexto(metrica, ano);
     if (!linhas.length) { vazio('cmp', 'Sem dados para este indicador e ano.'); return; }
-    const fmt = (v) => escala === 'mil' ? nf1.format(v) : (metrica === 'caged' || metrica === 'saldoEmp' ? sinal(v) : nf.format(v));
+    const fmt = (v) => escala === 'mil' ? nf1.format(v) : (metrica === 'caged' ? sinal(v) : nf.format(v));
     desenhar('cmp', {
       type: 'bar', data: { labels: linhas.map((l) => l.nome), datasets: [{ data: linhas.map((l) => l.mostra),
         backgroundColor: linhas.map((l) => l.principal ? cor('--series-1') : cor('--outros')), borderRadius: 4, borderSkipped: false, maxBarThickness: 30 }] },
@@ -609,12 +465,12 @@
   }));
 
   // ---------- status das fontes ----------
-  const NOMES = { empresas: 'Empresas', emprego: 'Emprego', bolsa: 'Bolsa Família' };
+  const NOMES = { emprego: 'Emprego', bolsa: 'Bolsa Família' };
   const st = Object.entries(D.status || {}).filter(([f]) => NOMES[f] && !EXEMPLO.includes(f)).map(([f, s]) => s.ok ? `${NOMES[f]}: ${new Date(s.atualizado_em).toLocaleDateString('pt-BR')}`
     : `<span class="falha">${NOMES[f]}: última tentativa falhou, exibindo dados de ${s.atualizado_em ? new Date(s.atualizado_em).toLocaleDateString('pt-BR') : '—'}</span>`);
   document.getElementById('status-fontes').innerHTML = st.length ? `<b>Última coleta por fonte:</b> ${st.join(' · ')}` : '';
 
-  kpis(); renderEmpresas(); retratoEmpresas(); renderEmprego(); renderBolsa(); renderComparar();
+  kpis(); renderEmprego(); renderBolsa(); renderComparar();
 })();
 </script>
 </body>

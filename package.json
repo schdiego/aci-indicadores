@@ -4,15 +4,13 @@
   "description": "Indicadores econômicos de Bom Princípio/RS para o site da ACI",
   "scripts": {
     "coletar": "node src/index.js",
-    "empresas": "node src/index.js --empresas-local",
     "exemplo": "node scripts/gerar-exemplo.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "chart.js": "^4.6.1",
-    "yauzl": "^3.4.0"
+    "chart.js": "^4.6.1"
   },
   "type": "module"
 }
