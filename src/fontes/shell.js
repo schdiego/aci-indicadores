@@ -7,7 +7,7 @@ const execFileP = promisify(execFile);
 
 // Baixa uma URL para um arquivo local, com novas tentativas.
 export async function baixar(url, destino, { usuario } = {}) {
-  const args = ['-fsSL', '--retry', '5', '--retry-delay', '10', '--connect-timeout', '60', '-o', destino];
+  const args = ['-fsSL', '--retry', '8', '--retry-delay', '30', '--retry-all-errors', '--connect-timeout', '60', '-o', destino];
   if (usuario) args.push('-u', usuario);
   args.push(url);
   await execFileP('curl', args, { maxBuffer: 1024 * 1024 });
@@ -15,7 +15,7 @@ export async function baixar(url, destino, { usuario } = {}) {
 
 // Texto de uma URL (listagens de FTP/WebDAV).
 export async function texto(url, extra = []) {
-  const { stdout } = await execFileP('curl', ['-fsSL', '--retry', '5', '--retry-delay', '10', ...extra, url], {
+  const { stdout } = await execFileP('curl', ['-fsSL', '--retry', '8', '--retry-delay', '30', '--retry-all-errors', ...extra, url], {
     maxBuffer: 64 * 1024 * 1024,
   });
   return stdout;
