@@ -1,13 +1,14 @@
 name: Atualizar indicadores
 
 on:
-  # Roda na hora sempre que o código for atualizado no GitHub (ignora os commits
-  # de dados que o próprio robô faz, para não entrar em loop).
+  # Roda na hora sempre que o código ou o dados/empresas.json forem atualizados no GitHub
+  # (ignora os arquivos que o próprio robô grava, para não entrar em loop).
   push:
     branches: [main]
     paths-ignore:
       - 'site/dados.json'
-      - 'dados/**'
+      - 'dados/cache-caged.json'
+      - 'dados/mapa-empresas.json'
   schedule:
     # Dias 3 e 18 de cada mês, 06:17 de Brasília (09:17 UTC).
     # O CAGED sai no fim do mês seguinte, o CNPJ da Receita em meados do mês
