@@ -34,10 +34,16 @@ jobs:
     runs-on: ubuntu-latest
     # A primeira execução baixa o histórico do CAGED desde 2020 e a base do CNPJ (~11 GB).
     timeout-minutes: 340
+    outputs:
+      coleta: ${{ steps.coleta.outcome }}
     steps:
-      - uses: actions/checkout@v4
+      # Sempre parte da versão mais nova da main (uma execução que ficou na fila
+      # não pode partir de um commit antigo, senão o push dos dados é recusado).
+      - uses: actions/checkout@v7
+        with:
+          ref: main
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -61,23 +67,41 @@ jobs:
 
       - name: Salvar dados no repositório
         if: always()
+        continue-on-error: true
         run: |
           git config user.name "aci-indicadores-bot"
           git config user.email "actions@users.noreply.github.com"
           git add site/dados.json dados/
-          git diff --cached --quiet || git commit -m "Atualiza indicadores ($(date +%Y-%m-%d))"
-          git push
+          git diff --cached --quiet && exit 0
+          git commit -m "Atualiza indicadores ($(date +%Y-%m-%d))"
+          # Se a main mudou durante a coleta, reaplica o commit por cima (os dados novos prevalecem).
+          for i in 1 2 3; do
+            git push && exit 0
+            git pull --rebase -X theirs origin main
+          done
+          exit 1
 
-      - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/configure-pages@v6
+        if: always()
+      - uses: actions/upload-pages-artifact@v5
+        if: always()
         with:
           path: site
 
+  publicar:
+    needs: coletar
+    if: always() && needs.coletar.result != 'cancelled'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
       - name: Publicar no GitHub Pages
-        uses: actions/deploy-pages@v4
+        id: deploy
+        uses: actions/deploy-pages@v5
 
       - name: Avisar se alguma fonte falhou
-        if: steps.coleta.outcome == 'failure'
+        if: needs.coletar.outputs.coleta == 'failure'
         run: |
           echo "::error::Alguma fonte falhou na coleta. Os dados anteriores dela foram mantidos no site. Veja o passo 'Coletar dados'."
           exit 1
