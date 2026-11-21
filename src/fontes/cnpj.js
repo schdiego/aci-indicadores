@@ -7,9 +7,9 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { ANO_INICIAL } from '../config.js';
-import { baixar, texto, linhasDe, camposReceita, normalizar } from './shell.js';
+import { baixarHttp as baixar, textoHttp, linhasDoZip, camposReceita, normalizar } from './shell.js';
 
-const BASE = 'https://arquivos.receitafederal.gov.br/public.php/webdav/Dados/Cadastros/CNPJ/';
+const BASE = process.env.RFB_BASE || 'https://arquivos.receitafederal.gov.br/public.php/webdav/Dados/Cadastros/CNPJ/';
 // Token público do compartilhamento (o mesmo usado pelo link aberto da Receita).
 const TOKEN = process.env.RFB_SHARE_TOKEN || 'gn672Ad4CF8N6TK';
 const AUTH = `${TOKEN}:`;
@@ -17,7 +17,7 @@ const AUTH = `${TOKEN}:`;
 // Lista o conteúdo de uma pasta do WebDAV (nomes dos itens).
 async function listar(url) {
   for (let i = 0; i < 4; i++) {
-    const xml = await texto(url, ['-X', 'PROPFIND', '-H', 'Depth: 1', '-u', AUTH]);
+    const xml = await textoHttp(url, { metodo: 'PROPFIND', cabecalhos: { Depth: '1' }, usuario: AUTH });
     const nomes = [...xml.matchAll(/<d:href>([^<]+)<\/d:href>/gi)]
       .map((m) => decodeURIComponent(m[1]).replace(/\/$/, '').split('/').pop())
       .filter(Boolean);
@@ -62,7 +62,7 @@ export async function empresas(municipios, { mes } = {}) {
     const zipMun = join(tmp, 'mun.zip');
     await baixar(urlPasta + munZip, zipMun, { usuario: AUTH });
     const porNome = new Map();
-    await linhasDe('unzip', ['-p', zipMun], (l) => {
+    await linhasDoZip(zipMun, (l) => {
       const [cod, nome] = camposReceita(l);
       if (cod && nome) (porNome.get(normalizar(nome)) || porNome.set(normalizar(nome), []).get(normalizar(nome))).push(cod);
     });
@@ -72,8 +72,6 @@ export async function empresas(municipios, { mes } = {}) {
       if (!cods) throw new Error(`Município ${m.nome} não encontrado na tabela da Receita`);
       for (const c of cods) ibgePorCodRf.set(c, m.id); // homônimos de outros estados são descartados pelo filtro de UF
     }
-    const codigos = [...ibgePorCodRf.keys()];
-    const filtro = `;"RS";"(${codigos.join('|')})";`;
 
     // 2) Estabelecimentos dos municípios, arquivo por arquivo.
     const linhas = [];
@@ -81,10 +79,10 @@ export async function empresas(municipios, { mes } = {}) {
       const zip = join(tmp, nome);
       console.log(`  CNPJ ${pasta}: baixando ${nome}…`);
       await baixar(urlPasta + nome, zip, { usuario: AUTH });
-      await linhasDe('sh', ['-c', `unzip -p "${zip}" | grep -aE '${filtro}'`], (l) => {
+      await linhasDoZip(zip, (l) => {
         const c = camposReceita(l);
         if (c[19] === 'RS' && ibgePorCodRf.has(c[20])) linhas.push(c);
-      });
+      }, { contem: ';"RS";' });
       await rm(zip, { force: true });
     }
     console.log(`  CNPJ: ${linhas.length} estabelecimentos nos municípios selecionados`);
@@ -95,7 +93,7 @@ export async function empresas(municipios, { mes } = {}) {
       const basicos = new Set(linhas.map((c) => c[0]));
       const zip = join(tmp, 'simples.zip');
       await baixar(urlPasta + simples, zip, { usuario: AUTH });
-      await linhasDe('unzip', ['-p', zip], (l) => {
+      await linhasDoZip(zip, (l) => {
         const c = camposReceita(l);
         if (basicos.has(c[0]) && c[5]) meiPorBasico.set(c[0], c[5]);
       });

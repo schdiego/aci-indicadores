@@ -120,7 +120,7 @@
   <!-- ========================= EMPRESAS ========================= -->
   <section class="bloco" id="empresas">
     <h2>Empresas</h2>
-    <p class="desc">Estabelecimentos (matrizes e filiais) com endereço em Bom Princípio, pela data de abertura e de baixa no CNPJ.</p>
+    <p class="desc" id="d-empresas">Empresas com endereço em Bom Princípio, pela data de abertura e de baixa no CNPJ.</p>
     <div class="controles">
       <div class="grupo" role="group" aria-label="Indicador">
         <span class="rotulo">Mostrar</span>
@@ -228,7 +228,7 @@
   <footer class="fontes">
     <h3>Fontes e metodologia</h3>
     <ul>
-      <li><b>Empresas:</b> <a href="https://dados.gov.br/dados/conjuntos-dados/cadastro-nacional-da-pessoa-juridica---cnpj" target="_blank" rel="noopener">dados abertos do CNPJ</a> (Receita Federal). Conta estabelecimentos pela data de início de atividade (abertas) e pela data de baixa (fechadas). “Abertas como MEI”: optantes do MEI na abertura.</li>
+      <li><b>Empresas:</b> <a href="https://dados.gov.br/dados/conjuntos-dados/cadastro-nacional-da-pessoa-juridica---cnpj" target="_blank" rel="noopener">dados abertos do CNPJ</a> (Receita Federal) para o histórico e os setores: conta estabelecimentos (matrizes e filiais) pela data de início de atividade (abertas) e pela data de baixa (fechadas); “abertas como MEI” são optantes do MEI na abertura. Os meses mais recentes vêm do <a href="https://www.gov.br/memp/pt-br/acesso-a-informacao/dados-abertos/repositorio-de-dados-abertos" target="_blank" rel="noopener">Mapa de Empresas</a> (Ministério do Empreendedorismo), que pode diferir um pouco do CNPJ na contagem.</li>
       <li><b>Emprego:</b> <a href="https://www.gov.br/trabalho-e-emprego/pt-br/assuntos/estatisticas-trabalho/novo-caged" target="_blank" rel="noopener">Novo CAGED</a> (Ministério do Trabalho e Emprego), microdados de movimentação, incluindo declarações fora do prazo e exclusões (critério “com ajustes”).</li>
       <li><b>Bolsa Família:</b> <a href="https://portaldatransparencia.gov.br" target="_blank" rel="noopener">Portal da Transparência</a> (CGU), pagamentos por município.</li>
       <li><b>População:</b> Censo Demográfico 2022 (IBGE).</li>
@@ -455,7 +455,7 @@
       .map(([s, v]) => [s, empMetrica === 'saldo' ? v.abertas - v.fechadas : v[campoSetor]]).sort((x, y) => y[1] - x[1]);
     document.getElementById('t-emp-setor').textContent = `${ROT_EMP[empMetrica]} por setor — ${anoSetor}`;
     document.getElementById('n-emp-setor').textContent = anoSetor === aRef ? `Até ${nomeMes(refEmp)}.` : 'Ano completo.';
-    if (!pares.length) vazio('emp-setor', 'Sem dados por setor para este ano.');
+    if (!pares.length) vazio('emp-setor', D.empresas?.cnpj_ate ? 'Sem dados por setor para este ano.' : 'Os setores aparecem depois da primeira coleta do cadastro da Receita.');
     else desenhar('emp-setor', {
       type: 'bar', data: { labels: pares.map((p) => p[0]), datasets: [{ data: pares.map((p) => p[1]), backgroundColor: cor('--series-1'), borderRadius: 4, borderSkipped: false, maxBarThickness: 26 }] },
       options: { indexAxis: 'y', maintainAspectRatio: false, scales: { x: { grid: { color: cor('--grid') }, border: { display: false }, ticks: { maxTicksLimit: 5 } }, y: { grid: { display: false }, border: { color: cor('--border') } } },
@@ -468,13 +468,18 @@
     const ab = aRef ? somaPeriodo(EMP, aRef, mRef, 'abertas') : null;
     const mei = aRef ? somaPeriodo(EMP, aRef, mRef, 'abertas_mei') : null;
     const fe = aRef ? somaPeriodo(EMP, aRef, mRef, 'fechadas') : null;
-    document.getElementById('n-emp-retrato').textContent = D.empresas?.referencia
-      ? `Cadastro da Receita de ${new Date(D.empresas.referencia + 'T12:00:00').toLocaleDateString('pt-BR')}; acumulados de ${aRef} até ${MESES[mRef - 1]}.` : '';
+    const iniMapa = D.empresas?.inicio_mapa, cnpjAte = D.empresas?.cnpj_ate;
+    let fonteTxt = '';
+    if (iniMapa && cnpjAte) fonteTxt = `Cadastro da Receita até ${nomeMes(cnpjAte)}; a partir de ${nomeMes(iniMapa)}, Mapa de Empresas.`;
+    else if (iniMapa) fonteTxt = `Mapa de Empresas, até ${nomeMes(refEmp)}.`;
+    else if (D.empresas?.referencia) fonteTxt = `Cadastro da Receita de ${new Date(D.empresas.referencia + 'T12:00:00').toLocaleDateString('pt-BR')}.`;
+    document.getElementById('n-emp-retrato').textContent = fonteTxt + (aRef ? ` Acumulados de ${aRef} até ${MESES[mRef - 1]}.` : '');
     const itens = [];
-    if (ativas != null) itens.push(['Estabelecimentos ativos', nf.format(ativas)]);
-    if (ab != null) itens.push([`Abertos em ${aRef}`, nf.format(ab)]);
-    if (ab && mei != null) itens.push([`Abertos como MEI em ${aRef}`, `${Math.round((mei / ab) * 100)}%`]);
-    if (fe != null) itens.push([`Baixados em ${aRef}`, nf.format(fe)]);
+    if (ativas != null) itens.push([iniMapa ? 'Empresas ativas' : 'Estabelecimentos ativos', nf.format(ativas)]);
+    if (ab != null) itens.push([`Abertas em ${aRef}`, nf.format(ab)]);
+    // O Mapa de Empresas não informa MEI: só mostra a fatia de MEI se o ano inteiro vier do CNPJ.
+    if (ab && mei != null && !(iniMapa && iniMapa <= refEmp && +iniMapa.slice(0, 4) <= aRef)) itens.push([`Abertas como MEI em ${aRef}`, `${Math.round((mei / ab) * 100)}%`]);
+    if (fe != null) itens.push([`Fechadas em ${aRef}`, nf.format(fe)]);
     document.getElementById('emp-retrato').innerHTML = itens.map(([r, v]) => `<div><div class="val">${v}</div><div class="rot">${r}</div></div>`).join('') || '<p class="nota">Dados ainda não coletados.</p>';
   }
   document.querySelectorAll('[data-emp-metrica]').forEach((b) => b.addEventListener('click', () => {

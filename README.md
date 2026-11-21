@@ -16,7 +16,8 @@ GitHub Actions (dias 3 e 18)  ──►  src/index.js  ──►  site/dados.jso
 
 | Indicador | Fonte | Atualização |
 |---|---|---|
-| Empresas abertas e fechadas, setor, MEI, ativas | Dados abertos do CNPJ (Receita Federal): Estabelecimentos, Simples, Municípios | mensal |
+| Empresas abertas e fechadas, setor, MEI, ativas (histórico) | Dados abertos do CNPJ (Receita Federal): Estabelecimentos, Simples, Municípios — rodado no computador | mensal |
+| Empresas abertas, fechadas e ativas (meses recentes) | Mapa de Empresas (MEMP), planilhas de dados abertos — automático no GitHub | mensal |
 | Admissões, desligamentos e saldo, por setor | Microdados do Novo CAGED (MTE), arquivos MOV + FOR − EXC (dados "com ajustes") | mensal |
 | Beneficiários e valor pago do Bolsa Família | API do Portal da Transparência (CGU) | mensal |
 | População | Censo 2022 (IBGE/SIDRA) | fixa |
@@ -29,12 +30,31 @@ da página é o saldo do Novo CAGED.
 1. **Portal da Transparência**: cadastre um e-mail em
    https://portaldatransparencia.gov.br/api-de-dados/cadastrar-email para receber a chave.
 2. **GitHub**: em *Settings → Secrets and variables → Actions*, crie o secret
-   `PORTAL_TRANSPARENCIA_KEY` com a chave recebida. (Sem a chave, empresas e emprego
-   são coletados normalmente e o Bolsa Família fica com os dados de exemplo.)
+   `PORTAL_TRANSPARENCIA_KEY` com a chave recebida. (Sem a chave, o Bolsa Família fica
+   com os dados de exemplo.)
 3. Em *Settings → Pages*, escolha **Source: GitHub Actions**.
 4. Em *Actions → Atualizar indicadores → Run workflow*, rode a primeira coleta. A primeira
-   leva bastante tempo (histórico do CAGED desde 2020 + ~11 GB do CNPJ). As próximas só
-   baixam os meses novos; o CNPJ só é baixado quando a Receita publica um mês novo.
+   leva bastante tempo (histórico do CAGED desde 2020). As próximas só baixam os meses novos.
+
+## Empresas
+
+Os meses recentes vêm sozinhos do Mapa de Empresas (o histórico das planilhas vai sendo
+guardado em `dados/mapa-empresas.json`). O histórico desde 2020, o setor e o MEI vêm da
+base do CNPJ, que precisa ser baixada num computador no Brasil — basta uma vez; repetir
+de vez em quando só deixa os dados do CNPJ mais atuais.
+
+### CNPJ: rodar no computador
+
+O servidor da Receita recusa conexões de fora do Brasil, e as máquinas do GitHub ficam
+nos EUA. Por isso a base do CNPJ é baixada num computador no Brasil (Windows, Mac ou Linux,
+só precisa do Node 22+):
+
+1. Baixe o projeto (*Code → Download ZIP*) e descompacte, ou use a pasta que já tem.
+2. Abra um terminal na pasta e rode, na primeira vez, `npm install`.
+3. Rode `npm run empresas`. Ele baixa ~11 GB, um arquivo por vez (apagando cada um
+   depois de ler), e grava `dados/empresas.json` (poucos KB). Leva de 30 min a algumas horas.
+4. No GitHub, abra a pasta `dados` → *Add file → Upload files* e envie o `empresas.json`.
+   O envio dispara o robô, que junta as empresas aos outros dados e publica o site.
 
 O resumo de cada arquivo do CAGED já processado fica em `dados/cache-caged.json` —
 não apague, senão a próxima execução baixa tudo de novo.
@@ -43,7 +63,7 @@ não apague, senão a próxima execução baixa tudo de novo.
 
 ```bash
 npm ci
-export PORTAL_TRANSPARENCIA_KEY=...   # precisa de curl, unzip e 7z instalados
+export PORTAL_TRANSPARENCIA_KEY=...   # o CAGED precisa de curl e 7z instalados
 npm run coletar       # coleta tudo e grava site/dados.json
 node src/index.js --so=bolsa   # só uma fonte
 npm run exemplo       # dados FICTÍCIOS para testar o visual
